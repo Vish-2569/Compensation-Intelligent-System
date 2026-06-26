@@ -1,0 +1,6 @@
+{
+  "name": "Compensation Intelligence System",
+  "description": "A comprehensive full-stack compensation analytics platform for comparing tech levels, tracking historical salary trends, normalizing location metrics, and consulting an AI career counselor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

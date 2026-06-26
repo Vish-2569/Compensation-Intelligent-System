@@ -1,0 +1,133 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                    String    @id @default(uuid())
+  email                 String    @unique
+  passwordHash          String?   @map("password_hash")
+  name                  String?
+  isAdmin               Boolean   @default(false) @map("is_admin")
+  authProvider          String    @default("email") @map("auth_provider")
+  googleId              String?   @unique @map("google_id")
+  avatarUrl             String?   @map("avatar_url")
+  bio                   String?
+  resumeUrl             String?   @map("resume_url")
+  reportsSubmitted      Int       @default(0) @map("reports_submitted")
+  negotiationsCreated   Int       @default(0) @map("negotiations_created")
+  emailVerified         Boolean   @default(false) @map("email_verified")
+  profileCompleted      Boolean   @default(false) @map("profile_completed")
+  currentJobTitle       String?   @map("current_job_title")
+  experienceYears       Int?      @map("experience_years")
+  companyName           String?   @map("company_name")
+  country               String?   @map("country")
+  preferredCurrency     String?   @map("preferred_currency")
+  expectedSalary        Int?      @map("expected_salary")
+  preferredLocation     String?   @map("preferred_location")
+  verificationToken     String?   @map("verification_token")
+  verificationTokenExpiresAt DateTime? @map("verification_token_expires_at")
+  resetToken            String?   @map("reset_token")
+  resetTokenExpiresAt   DateTime? @map("reset_token_expires_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  tier      String   @default("OTHER")
+  logoUrl   String?  @map("logo_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  levels        Level[]
+  compensations CompensationEntry[]
+
+  @@map("companies")
+}
+
+model Role {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  category  String   @default("OTHER")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  compensations CompensationEntry[]
+
+  @@map("roles")
+}
+
+model Level {
+  id           String   @id @default(uuid())
+  companyId    String   @map("company_id")
+  roleCategory String   @default("OTHER") @map("role_category")
+  levelName    String   @map("level_name")
+  levelOrder   Int      @map("level_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  compensations     CompensationEntry[]
+  mappedFromLevels  LevelMapping[]      @relation("MappedFrom")
+  mappedToLevels    LevelMapping[]      @relation("MappedTo")
+
+  @@unique([companyId, roleCategory, levelName])
+  @@map("levels")
+}
+
+model CompensationEntry {
+  id                 String    @id @default(uuid())
+  companyId          String    @map("company_id")
+  roleId             String    @map("role_id")
+  levelId            String    @map("level_id")
+  locationCity       String    @map("location_city")
+  locationCountry    String    @map("location_country")
+  locationRegion     String    @map("location_region")
+  yearsOfExperience  Int       @map("years_of_experience")
+  baseSalary         Float     @map("base_salary")
+  annualBonus        Float?    @map("annual_bonus")
+  equityValueAnnual  Float?    @map("equity_value_annual")
+  totalCash          Float     @map("total_cash")
+  totalCompensation  Float     @map("total_compensation")
+  currency           String    @default("INR")
+  offerDate          String    @map("offer_date") // e.g. "06-2026" or "June 2026"
+  employmentType     String    @default("FULLTIME") @map("employment_type")
+  dataSource         String    @default("SELF_REPORTED") @map("data_source")
+  isVerified         Boolean   @default(false) @map("is_verified")
+  qualityScore       Int       @default(100) @map("quality_score")
+  deletedAt          DateTime? @map("deleted_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+  role    Role    @relation(fields: [roleId], references: [id])
+  level   Level   @relation(fields: [levelId], references: [id])
+
+  @@index([companyId])
+  @@index([roleId])
+  @@index([levelId])
+  @@index([locationCountry, locationCity])
+  @@index([yearsOfExperience])
+  @@map("compensation_entries")
+}
+
+model LevelMapping {
+  id              String   @id @default(uuid())
+  fromLevelId     String   @map("from_level_id")
+  toLevelId       String   @map("to_level_id")
+  confidenceScore Float    @map("confidence_score")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  fromLevel Level @relation("MappedFrom", fields: [fromLevelId], references: [id], onDelete: Cascade)
+  toLevel   Level @relation("MappedTo", fields: [toLevelId], references: [id], onDelete: Cascade)
+
+  @@unique([fromLevelId, toLevelId])
+  @@map("level_mappings")
+}
