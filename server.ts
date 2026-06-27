@@ -126,8 +126,12 @@ const profilePayloadSchema = z.object({
   preferredJobLocation: z.string().trim().max(120).optional().or(z.literal("")),
   preferredCurrency: z.string().trim().max(8).optional().or(z.literal("")),
   bio: z.string().trim().max(500).optional().or(z.literal("")),
-  avatarUrl: z.string().trim().max(10000).optional().or(z.literal("")),
-  resumeUrl: z.string().trim().max(10000).optional().or(z.literal("")),
+  // Allow larger data URLs for avatar images (base64 expands size).
+  // Client enforces a 200KB file size limit; set a generous character limit
+  // to accommodate the `data:image/...;base64,` prefix and base64 expansion.
+  avatarUrl: z.string().trim().max(500000).optional().or(z.literal("")),
+  // Resume URLs are typically short paths, but keep them generous as well.
+  resumeUrl: z.string().trim().max(200000).optional().or(z.literal("")),
 });
 
 function getProfileCompletionPercent(user: {
@@ -479,6 +483,20 @@ app.put("/api/profile", authenticateToken, async (req, res) => {
     }
 
     const payload = parsed.data;
+    // If client sent a data URL for the avatar, validate its decoded size (bytes)
+    if (payload.avatarUrl && typeof payload.avatarUrl === "string" && payload.avatarUrl.startsWith("data:")) {
+      const commaIndex = payload.avatarUrl.indexOf(",");
+      const b64 = commaIndex >= 0 ? payload.avatarUrl.slice(commaIndex + 1) : payload.avatarUrl;
+      try {
+        const byteLen = Buffer.from(b64, "base64").length;
+        const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+        if (byteLen > MAX_BYTES) {
+          return res.status(400).json({ error: "Profile photo must be 5MB or smaller." });
+        }
+      } catch (e) {
+        // If base64 parsing fails, let the normal validation handle it later
+      }
+    }
     const normalizedEmail = payload.email?.toLowerCase().trim();
 
     if (normalizedEmail && normalizedEmail !== authUser.email) {

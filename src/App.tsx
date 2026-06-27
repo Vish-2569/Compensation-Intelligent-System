@@ -1323,11 +1323,27 @@ export default function App() {
                     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 mt-6 text-xs text-slate-500 space-y-2">
                       <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
                         <Info className="h-3.5 w-3.5 text-indigo-500" />
-                        <span>Vetting Metric Guide</span>
+                        <span>Salary Benchmark Guide</span>
                       </div>
-                      <p className="text-[11px] leading-relaxed">
-                        CompIntel filters outliers by matching values against standard deviation curves. A level {selectedMatrixLevel} engineer generally logs within 20% variance margins.
-                      </p>
+                      <div className="text-[11px] leading-relaxed space-y-2">
+                        <div>
+                          Salary benchmarks are calculated using verified compensation data submitted by professionals. Each standardized engineering level represents the market average of:
+                        </div>
+                        <ul className="list-disc ml-4 space-y-1">
+                          <li>
+                            <strong>Base Salary</strong> – Fixed annual compensation.
+                          </li>
+                          <li>
+                            <strong>Bonus</strong> – Performance-based cash incentives.
+                          </li>
+                          <li>
+                            <strong>Equity</strong> – Company stock grants (RSUs or stock options).
+                          </li>
+                        </ul>
+                        <div>
+                          Benchmarks are continuously refined as more verified salary submissions are added, improving their accuracy and reliability.
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

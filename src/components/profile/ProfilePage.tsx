@@ -90,6 +90,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [resumeName, setResumeName] = useState<string | null>(null);
   const [viewState, setViewState] = useState<"loading" | "ready" | "unauthorized">("loading");
 
   useEffect(() => {
@@ -131,6 +132,13 @@ export default function ProfilePage() {
           bio: data.profile.bio || "",
           resumeUrl: data.profile.resumeUrl || "",
         });
+        // Derive resume file name from stored URL if available
+        if (data.profile.resumeUrl) {
+          try {
+            const parts = String(data.profile.resumeUrl).split("/");
+            setResumeName(decodeURIComponent(parts[parts.length - 1] || ""));
+          } catch {}
+        }
       } catch (err: any) {
         setViewState("unauthorized");
         setError(err.message || "Unable to load profile");
@@ -210,11 +218,12 @@ export default function ProfilePage() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setError("Only JPG or PNG photos are supported.");
+      setError("Only image files are supported.");
       return;
     }
-    if (file.size > 200 * 1024) {
-      setError("Profile photo must be 200KB or smaller.");
+    // Allow larger images (up to 5MB). Server also accepts larger data URLs.
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Profile photo must be 5MB or smaller.");
       return;
     }
 
@@ -359,6 +368,8 @@ export default function ProfilePage() {
       if (!res.ok) throw new Error(data.error || "Unable to upload resume");
 
       setForm((current) => ({ ...current, resumeUrl: data.resumeUrl || "" }));
+      // Remember the original filename for display
+      setResumeName(file.name || null);
       setSuccess("Resume uploaded successfully.");
     } catch (err: any) {
       setError(err.message || "Unable to upload resume");
@@ -633,7 +644,7 @@ export default function ProfilePage() {
                   <input type="file" accept="application/pdf,.doc,.docx" className="hidden" onChange={handleResumeUpload} />
                 </label>
                 {form.resumeUrl ? (
-                  <a href={form.resumeUrl} download="resume.pdf" className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                  <a href={form.resumeUrl} download={resumeName || "resume.pdf"} className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
                     <Download className="h-3.5 w-3.5" /> Download
                   </a>
                 ) : null}
@@ -647,6 +658,9 @@ export default function ProfilePage() {
                 <div>
                   <div className="font-semibold text-slate-700">Resume ready for sharing</div>
                   <p className="mt-1 text-xs text-slate-500">Upload your latest resume and keep it available for hiring conversations and offer reviews.</p>
+                  {resumeName ? (
+                    <div className="mt-2 text-xs text-slate-600">File: <span className="font-medium text-slate-800">{resumeName}</span></div>
+                  ) : null}
                 </div>
               </div>
             </div>
