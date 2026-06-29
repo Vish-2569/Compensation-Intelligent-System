@@ -13,33 +13,39 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    const companyId = searchParams.get("company_id") || undefined;
-    const roleId = searchParams.get("role_id") || undefined;
-    const levelId = searchParams.get("level_id") || undefined;
-    const locationCountry = searchParams.get("location_country") || "India";
-    const locationCity = searchParams.get("location_city") || undefined;
-    const employmentType = searchParams.get("employment_type") || undefined;
+    const companyId = searchParams.get("company_id")?.trim() || undefined;
+    const roleId = searchParams.get("role_id")?.trim() || undefined;
+    const levelId = searchParams.get("level_id")?.trim() || undefined;
+    const locationCountry = searchParams.get("location_country")?.trim() || "India";
+    const locationCity = searchParams.get("location_city")?.trim() || undefined;
+    const employmentType = searchParams.get("employment_type")?.trim() || undefined;
 
-    const minYoe = searchParams.get("min_yoe") ? parseInt(searchParams.get("min_yoe")!, 10) : undefined;
-    const maxYoe = searchParams.get("max_yoe") ? parseInt(searchParams.get("max_yoe")!, 10) : undefined;
+    const minYoeRaw = searchParams.get("min_yoe")?.trim();
+    const maxYoeRaw = searchParams.get("max_yoe")?.trim();
+    const minYoe = minYoeRaw ? parseInt(minYoeRaw, 10) : undefined;
+    const maxYoe = maxYoeRaw ? parseInt(maxYoeRaw, 10) : undefined;
 
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
     const skip = (page - 1) * limit;
 
-    // Filters formulation
+    // Filters formulation — only apply non-empty values so empty params do not narrow results.
     const where: any = {
       deletedAt: null,
-      locationCountry,
-      companyId,
-      roleId,
-      levelId,
-      locationCity,
-      employmentType: employmentType || undefined,
-      yearsOfExperience: {
-        gte: minYoe,
-        lte: maxYoe,
-      },
+      ...(locationCountry ? { locationCountry } : {}),
+      ...(companyId ? { companyId } : {}),
+      ...(roleId ? { roleId } : {}),
+      ...(levelId ? { levelId } : {}),
+      ...(locationCity ? { locationCity } : {}),
+      ...(employmentType ? { employmentType } : {}),
+      ...(minYoe !== undefined || maxYoe !== undefined
+        ? {
+            yearsOfExperience: {
+              ...(minYoe !== undefined ? { gte: minYoe } : {}),
+              ...(maxYoe !== undefined ? { lte: maxYoe } : {}),
+            },
+          }
+        : {}),
     };
 
     // Execute queries in parallel using Prisma

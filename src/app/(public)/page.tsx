@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Header } from "../../components/layout/Header";
 import { Footer } from "../../components/layout/Footer";
 import { StatsBar } from "../../components/compensation/StatsBar";
@@ -30,6 +30,7 @@ export default function HomePublic() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [limit] = useState(20);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Stats bar state
   const [stats, setStats] = useState({
@@ -69,8 +70,8 @@ export default function HomePublic() {
     const fetchMetadata = async () => {
       try {
         const [companiesRes, rolesRes] = await Promise.all([
-          fetch("/api/companies"),
-          fetch("/api/roles"),
+          fetch(`${API_BASE_URL}/api/companies`),
+          fetch(`${API_BASE_URL}/api/roles`),
         ]);
         const companiesJson = await companiesRes.json();
         const rolesJson = await rolesRes.json();
@@ -115,6 +116,10 @@ export default function HomePublic() {
 
   // Master fetch query for compensation dataset
   const fetchCompensations = useCallback(async (pageToLoad = 1) => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsSearching(true);
     try {
       let queryParams = new URLSearchParams();
@@ -122,15 +127,24 @@ export default function HomePublic() {
       if (selectedLevelId) queryParams.append("level_id", selectedLevelId);
       if (selectedRoleCategory) queryParams.append("role_category", selectedRoleCategory);
       if (selectedCity) queryParams.append("location_city", selectedCity);
-      
+
       queryParams.append("min_yoe", String(yoeRange[0]));
       queryParams.append("max_yoe", String(yoeRange[1]));
       queryParams.append("page", String(pageToLoad));
       queryParams.append("limit", String(limit));
       queryParams.append("location_country", "India");
 
-      const response = await fetch(`/api/compensation?${queryParams.toString()}`);
+      const url = `/api/compensation?${queryParams.toString()}`;
+      console.log("[HomePublic] current filters:", { companyId: selectedCompanyId || null, levelId: selectedLevelId || null, roleCategory: selectedRoleCategory || null, city: selectedCity || null, yoeRange });
+      console.log("[HomePublic] API URL:", url);
+
+      const response = await fetch(url, { signal: controller.signal });
+      if (controller.signal.aborted) {
+        return;
+      }
+
       const json = await response.json();
+      console.log("[HomePublic] response count:", json.data?.length ?? 0);
 
       if (json.data) {
         setEntries(json.data);
@@ -138,18 +152,23 @@ export default function HomePublic() {
         setCurrentPage(json.meta.page);
         setTotalPages(Math.ceil(json.meta.total / limit));
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        return;
+      }
       console.error("Failed to search compensation matrix:", e);
     } finally {
-      setIsSearching(false);
-      setIsLoading(false);
+      if (!controller.signal.aborted) {
+        setIsSearching(false);
+        setIsLoading(false);
+      }
     }
   }, [selectedCompanyId, selectedLevelId, selectedRoleCategory, selectedCity, yoeRange, limit]);
 
-  // Trigger search on component mount
+  // Trigger search on component mount and whenever filters change.
   useEffect(() => {
     fetchCompensations(1);
-  }, []);
+  }, [fetchCompensations]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

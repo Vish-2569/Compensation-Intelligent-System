@@ -131,3 +131,26 @@ model LevelMapping {
   @@unique([fromLevelId, toLevelId])
   @@map("level_mappings")
 }
+
+model SalaryRecord {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()"))
+  companyTier         String   @map("company_tier")
+  companyNameOptional String?  @map("company_name_optional")
+  role                String
+  standardLevel       String   @map("standard_level")
+  baseSalary          Int      @map("base_salary")
+  annualBonus         Int      @map("annual_bonus")
+  annualStock         Int      @map("annual_stock")
+  yearsOfExperience   Int      @map("years_of_experience")
+  officeLocation      String   @map("office_location")
+  currency            String
+  submittedAt         DateTime @map("submitted_at")
+  totalCompensation   Int      @map("total_compensation")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([companyTier])
+  @@index([role])
+  @@index([standardLevel])
+  @@index([officeLocation])
+  @@map("salary_records")
+}

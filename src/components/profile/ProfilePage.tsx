@@ -65,13 +65,14 @@ const formatDate = (value: string | null | undefined) => {
   return new Date(value).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" });
 };
 
-const calculateCompletionPercent = (source: Partial<ProfileData> & Partial<ProfileForm>) => {
+const calculateCompletionPercent = (source: Partial<ProfileData> | Partial<ProfileForm>) => {
+  const yearsOfExperience = typeof source.yearsOfExperience === "number" ? source.yearsOfExperience : source.yearsOfExperience;
   const fields = [
     source.fullName,
     source.email,
     source.currentCompany,
     source.jobTitle,
-    source.yearsOfExperience !== null && source.yearsOfExperience !== undefined && source.yearsOfExperience !== "",
+    yearsOfExperience !== null && yearsOfExperience !== undefined && yearsOfExperience !== "",
     source.preferredJobLocation,
     source.preferredCurrency,
     source.bio,

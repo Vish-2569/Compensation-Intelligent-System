@@ -14,57 +14,49 @@ export function useCompensations(filters: CompensationFilters) {
   const [stats, setStats] = useState<CompensationListResponse["meta"]["stats"] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [debouncedFilters, setDebouncedFilters] = useState<CompensationFilters>(filters);
-
-  // Debounce filter modifications by 300ms
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedFilters(filters);
-    }, 300);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [
-    filters.companyId,
-    filters.roleId,
-    filters.levelId,
-    filters.locationCity,
-    filters.locationCountry,
-    filters.minExperience,
-    filters.maxExperience,
-    filters.search,
-  ]);
 
   const performFetch = useCallback(
     async (signal?: AbortSignal) => {
       setIsLoading(true);
       try {
-        const response = await fetchCompensations(debouncedFilters, signal);
+        console.log("[useCompensations] current filters:", filters);
+        const response = await fetchCompensations(filters, signal);
+
+        if (signal?.aborted) {
+          return;
+        }
+
+        console.log("[useCompensations] response count:", response.data.length);
         setData(response.data);
         setStats(response.meta.stats);
         setError(null);
       } catch (err: any) {
-        if (err.name !== "AbortError") {
-          setError(err instanceof Error ? err : new Error(String(err)));
+        if (err.name === "AbortError" || signal?.aborted) {
+          return;
         }
+
+        setError(err instanceof Error ? err : new Error(String(err)));
       } finally {
-        setIsLoading(false);
+        if (!signal?.aborted) {
+          setIsLoading(false);
+        }
       }
     },
-    [debouncedFilters]
+    [filters]
   );
 
   useEffect(() => {
     const controller = new AbortController();
     performFetch(controller.signal);
+
     return () => {
       controller.abort();
     };
   }, [performFetch]);
 
   const refetch = useCallback(() => {
-    performFetch();
+    const controller = new AbortController();
+    performFetch(controller.signal);
   }, [performFetch]);
 
   return { data, stats, isLoading, error, refetch };

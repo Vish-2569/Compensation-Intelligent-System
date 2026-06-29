@@ -5,6 +5,9 @@
 
 export enum RoleType {
   SOFTWARE_ENGINEER = "Software Engineer",
+  DATA_ENGINEER = "Data Engineer",
+  DEVOPS_ENGINEER = "DevOps Engineer",
+  CYBERSECURITY_ENGINEER = "Cybersecurity Engineer",
   PRODUCT_MANAGER = "Product Manager",
   DATA_SCIENTIST = "Data Scientist",
   PRODUCT_DESIGNER = "Product Designer"

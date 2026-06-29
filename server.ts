@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+
+
 import express from "express";
 import path from "path";
 import crypto from "crypto";
@@ -28,6 +30,14 @@ dotenv.config({ path: ".env" });
 dotenv.config({ path: ".env.example" });
 
 const app = express();
+
+import cors from "cors";
+
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
+
 const DEFAULT_PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST;
 
@@ -86,10 +96,10 @@ let compensations: CompensationRecord[] = [...SEED_COMPENSATIONS];
 
 // In-memory role views tracker (Trending Roles)
 let roleViews: Record<string, number> = {
-  "Software Engineer": 1520,
-  "Product Manager": 840,
-  "Data Scientist": 620,
-  "Product Designer": 410
+  "Software Engineer": 2450,
+  "Data Engineer": 1880,
+  "DevOps Engineer": 1420,
+  "Cybersecurity Engineer": 980
 };
 
 const JWT_SECRET = process.env.JWT_SECRET || "compintel-dev-secret";
@@ -1145,13 +1155,7 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  }
+  } 
 
   const port = DEFAULT_PORT;
   const listenHost = HOST || "0.0.0.0";

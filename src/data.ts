@@ -172,6 +172,23 @@ export const SEED_COMPENSATIONS: CompensationRecord[] = [
     verified: true,
     submittedAt: "2026-06-15T11:45:00Z"
   },
+  {
+    id: "3b",
+    companyName: "Google",
+    tier: CompanyTier.TIER_1,
+    role: RoleType.DATA_ENGINEER,
+    levelCode: "L4",
+    standardLevel: "L2",
+    baseSalary: 2800000,
+    bonus: 300000,
+    equity: 700000,
+    totalCompensation: 3800000,
+    location: "Bangalore, IN",
+    yearsOfExperience: 4,
+    yearsAtCompany: 2,
+    verified: true,
+    submittedAt: "2026-06-17T10:00:00Z"
+  },
   // Meta
   {
     id: "4",
@@ -223,6 +240,23 @@ export const SEED_COMPENSATIONS: CompensationRecord[] = [
     yearsAtCompany: 3,
     verified: false,
     submittedAt: "2026-06-22T17:00:00Z"
+  },
+  {
+    id: "6b",
+    companyName: "Datadog",
+    tier: CompanyTier.TIER_2,
+    role: RoleType.DEVOPS_ENGINEER,
+    levelCode: "L4",
+    standardLevel: "L2",
+    baseSalary: 2400000,
+    bonus: 250000,
+    equity: 500000,
+    totalCompensation: 3150000,
+    location: "Hyderabad, IN",
+    yearsOfExperience: 5,
+    yearsAtCompany: 2,
+    verified: true,
+    submittedAt: "2026-06-18T14:10:00Z"
   },
   // Amazon
   {
@@ -293,6 +327,23 @@ export const SEED_COMPENSATIONS: CompensationRecord[] = [
     yearsAtCompany: 1,
     verified: false,
     submittedAt: "2026-06-11T12:00:00Z"
+  },
+  {
+    id: "10b",
+    companyName: "Palo Alto Networks",
+    tier: CompanyTier.TIER_2,
+    role: RoleType.CYBERSECURITY_ENGINEER,
+    levelCode: "L4",
+    standardLevel: "L2",
+    baseSalary: 2600000,
+    bonus: 280000,
+    equity: 700000,
+    totalCompensation: 3580000,
+    location: "Bangalore, IN",
+    yearsOfExperience: 6,
+    yearsAtCompany: 2,
+    verified: true,
+    submittedAt: "2026-06-16T09:40:00Z"
   },
   // Uber (Tier 2)
   {

@@ -57,14 +57,14 @@ export interface CompensationEntryWithRelations {
 }
 
 export interface CompensationFilters {
-  roleId?: string;
-  companyId?: string;
-  levelId?: string;
-  locationCity?: string;
-  locationCountry?: string;
-  minExperience?: number;
-  maxExperience?: number;
-  search?: string;
+  roleId?: string | null;
+  companyId?: string | null;
+  levelId?: string | null;
+  locationCity?: string | null;
+  locationCountry?: string | null;
+  minExperience?: number | null;
+  maxExperience?: number | null;
+  search?: string | null;
 }
 
 export interface CompensationStats {
