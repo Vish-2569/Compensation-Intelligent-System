@@ -73,7 +73,7 @@ export default function ComparePublic() {
   useEffect(() => {
     const loadCompanies = async () => {
       try {
-        const res = await fetch("/api/companies");
+        const res = await fetch(`${API_BASE_URL}/api/companies`);
         const json = await res.json();
         setCompanies(json.data || []);
         
@@ -109,7 +109,7 @@ export default function ComparePublic() {
 
     setIsComparing(true);
     try {
-      const response = await fetch("/api/compare", {
+      const response = await fetch(`${API_BASE_URL}/api/compare`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

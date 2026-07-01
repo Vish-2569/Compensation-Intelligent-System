@@ -89,7 +89,7 @@ export default function AdminPage() {
     setError(null);
     try {
       const token = getAdminToken();
-      const res = await fetch("/api/admin", {
+      const res = await fetch(`${API_BASE_URL}/api/admin`, {
         headers: {
           "x-admin-token": token,
         },
@@ -121,7 +121,7 @@ export default function AdminPage() {
     setActionLoading(id);
     try {
       const token = getAdminToken();
-      const res = await fetch(`/api/compensation/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/compensation/${id}`, {
         method: "PATCH",
         headers: {
           "x-admin-token": token,

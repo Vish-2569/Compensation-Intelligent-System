@@ -304,7 +304,7 @@ export default function App() {
     if (!user?.token) return;
 
     try {
-      const res = await fetch("/api/auth/profile", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -361,7 +361,7 @@ export default function App() {
     setAuthLoading(true);
 
     try {
-      const res = await fetch("/api/auth/google", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credential: credentialResponse.credential })
@@ -442,7 +442,7 @@ export default function App() {
     }
 
     // Fetch trending roles and normalize to the requested priority list
-    fetch("/api/trending")
+    fetch(`${API_BASE_URL}/api/trending`)
       .then(res => res.json())
       .then(data => {
         const preferredOrder = ["Software Engineer", "Data Engineer", "DevOps Engineer", "Cybersecurity Engineer"];
@@ -459,13 +459,13 @@ export default function App() {
   // Track role view dynamically when a user filters by a role
   useEffect(() => {
     if (selectedRole) {
-      fetch("/api/trending/view", {
+      fetch(`${API_BASE_URL}/api/trending/view`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role: selectedRole })
       })
       .then(() => {
-        fetch("/api/trending")
+        fetch(`${API_BASE_URL}/api/trending`)
           .then(res => res.json())
           .then(data => {
             const preferredOrder = ["Software Engineer", "Data Engineer", "DevOps Engineer", "Cybersecurity Engineer"];
@@ -600,7 +600,7 @@ export default function App() {
         headers["Authorization"] = `Bearer ${user.token}`;
       }
 
-      const response = await fetch("/api/compensations", {
+      const response = await fetch(`${API_BASE_URL}/api/compensation`, {
         method: "POST",
         headers,
         body: JSON.stringify(submitForm),
@@ -660,7 +660,7 @@ export default function App() {
         userQuery: aiQuery || `Provide a tailored salary negotiation strategy evaluating Offer A (${offerA.companyName}) against Offer B (${offerB.companyName}).`
       };
 
-      const res = await fetch("/api/advisor", {
+      const res = await fetch(`${API_BASE_URL}/api/advisor`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(reqPayload),

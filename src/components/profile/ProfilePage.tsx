@@ -106,7 +106,7 @@ export default function ProfilePage() {
           return;
         }
 
-        const res = await fetch("/api/profile", {
+        const res = await fetch(`${API_BASE_URL}/api/profile`, {
           headers: { Authorization: `Bearer ${saved.token}` },
         });
 
@@ -235,7 +235,7 @@ export default function ProfilePage() {
       const saved = token ? JSON.parse(token) : null;
 
       try {
-        const res = await fetch("/api/profile", {
+        const res = await fetch(`${API_BASE_URL}/api/profile`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -293,7 +293,7 @@ export default function ProfilePage() {
 
       const token = localStorage.getItem("compintel_user") || sessionStorage.getItem("compintel_user");
       const saved = token ? JSON.parse(token) : null;
-      const res = await fetch("/api/profile", {
+      const res = await fetch(`${API_BASE_URL}/api/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -359,7 +359,7 @@ export default function ProfilePage() {
       const formData = new FormData();
       formData.append("resume", file);
 
-      const res = await fetch("/api/profile/resume", {
+      const res = await fetch(`${API_BASE_URL}/api/profile/resume`, {
         method: "POST",
         headers: { Authorization: `Bearer ${saved?.token}` },
         body: formData,
@@ -383,7 +383,7 @@ export default function ProfilePage() {
     setError(null);
     setSuccess(null);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: "candidate@compintel.com", password: "candidate123" }),
