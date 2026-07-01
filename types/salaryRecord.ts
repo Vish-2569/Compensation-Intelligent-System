@@ -40,7 +40,7 @@ export const COMMON_TECH_ROLES = [
 export type SalaryRecord = {
   companyTier: CompanyTier;
   companyNameOptional?: string;
-  role: (typeof COMMON_TECH_ROLES)[number];
+  role: string;
   standardLevel: StandardLevel;
   baseSalary: number;
   annualBonus: number;

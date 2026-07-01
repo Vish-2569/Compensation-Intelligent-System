@@ -34,8 +34,10 @@ export function useCompanies() {
         setCompanies(data);
       } catch (err) {
         console.error("Error loading companies in useCompanies hook:", err);
-        // Reset the promise cache so we can attempt a retry on next render/mount
         cachedPromise = null;
+        if (!cachedCompanies) {
+          setCompanies([]);
+        }
       } finally {
         setIsLoading(false);
       }

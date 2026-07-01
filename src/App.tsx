@@ -49,10 +49,34 @@ import {
 } from "recharts";
 
 import { RoleType, CompanyTier, CompensationRecord, LevelMapping, LocationInfo, Offer, AIAdvisorResponse } from "./types.ts";
+import { LEVEL_MATRICES } from "./data.ts";
 import { formatINR } from "./lib/utils.ts";
 import { getPasswordStrength } from "./lib/auth-utils.ts";
 import ProfilePage from "./components/profile/ProfilePage.tsx";
+import AnonymousSalaryShareForm from "./components/compensation/AnonymousSalaryShareForm.tsx";
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+function isLevelMappingArray(value: unknown): value is LevelMapping[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((item) => {
+      return (
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as LevelMapping).standardLevel === "string" &&
+        typeof (item as LevelMapping).title === "string" &&
+        typeof (item as LevelMapping).google === "string" &&
+        typeof (item as LevelMapping).meta === "string" &&
+        typeof (item as LevelMapping).apple === "string" &&
+        typeof (item as LevelMapping).amazon === "string" &&
+        typeof (item as LevelMapping).microsoft === "string" &&
+        typeof (item as LevelMapping).netflix === "string" &&
+        typeof (item as LevelMapping).flipkart === "string"
+      );
+    })
+  );
+}
 
 function CompanyLogo({ name, className = "" }: { name: string; className?: string }) {
   const cleanName = name.trim().toLowerCase();
@@ -184,9 +208,17 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "levels" | "evaluator" | "advisor" | "share" | "profile">("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
+  useEffect(() => {
+    const pathname = window.location.pathname;
+
+    if (pathname === "/submit") {
+      setActiveTab("share");
+    }
+  }, []);
+
   // Global Metadata States loaded from backend
   const [locations, setLocations] = useState<LocationInfo[]>([]);
-  const [levelMatrices, setLevelMatrices] = useState<LevelMapping[]>([]);
+  const [levelMatrices, setLevelMatrices] = useState<LevelMapping[]>(LEVEL_MATRICES);
   const [compensations, setCompensations] = useState<CompensationRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -396,18 +428,21 @@ export default function App() {
       try {
         setIsLoading(true);
         const [compRes, levelRes, locRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/compensations`),
+          fetch(`${API_BASE_URL}/api/compensation`),
           fetch(`${API_BASE_URL}/api/levels`),
           fetch(`${API_BASE_URL}/api/locations`)
         ]);
 
         if (compRes.ok && levelRes.ok && locRes.ok) {
-          const comps = await compRes.json();
+          const payload = await compRes.json();
+          const comps = Array.isArray(payload) ? payload : (payload?.data ?? []);
           const levels = await levelRes.json();
           const locs = await locRes.json();
 
           setCompensations(comps);
-          setLevelMatrices(levels);
+          if (isLevelMappingArray(levels)) {
+            setLevelMatrices(levels);
+          }
           setLocations(locs);
         }
       } catch (err) {
@@ -1928,343 +1963,7 @@ export default function App() {
               )}
 
               {/* TAB 7: ANONYMOUS SALARY SHARE */}
-              {activeTab === "share" && (
-                <div className="max-w-6xl mx-auto">
-                  <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.9fr)] gap-6">
-                    <div className="space-y-6">
-                      <div>
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="rounded-2xl bg-blue-500/10 p-3 ring-1 ring-blue-500/10">
-                            <Share2 className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Anonymous Compensation Submission</h2>
-                          </div>
-                        </div>
-                        <p className="text-sm text-slate-500 leading-relaxed pl-1">
-                          Contribute compensation data anonymously to improve market transparency.
-                        </p>
-                        <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
-                          <div className="rounded-xl bg-blue-100 p-2">
-                            <Lock className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <div>
-                            <span className="block text-xs font-semibold text-slate-800">Anonymous submission</span>
-                            <span className="text-xs text-slate-500">No personal identifiers are stored. Only aggregated statistics are used.</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <form onSubmit={handleSalarySubmit} className="space-y-6">
-                        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_-24px_rgba(15,23,42,0.45)] transition-all duration-300 hover:shadow-[0_16px_50px_-24px_rgba(37,99,235,0.4)]">
-                          <div className="flex items-center gap-3 mb-5">
-                            <div className="rounded-2xl bg-slate-100 p-2">
-                              <Building className="h-4 w-4 text-slate-600" />
-                            </div>
-                            <h3 className="text-base font-semibold text-slate-900">Company Information</h3>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 block mb-2">Company Name</label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="e.g. Google, Meta, Stripe"
-                                value={submitForm.companyName}
-                                onChange={(e) => setSubmitForm({ ...submitForm, companyName: e.target.value })}
-                                className="bg-slate-50 text-sm border border-slate-200 rounded-2xl px-4 py-3 w-full focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none transition-all duration-200"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 block mb-2">Company Tier</label>
-                              <select
-                                value={submitForm.tier}
-                                onChange={(e) => setSubmitForm({ ...submitForm, tier: e.target.value as CompanyTier })}
-                                className="bg-slate-50 text-sm border border-slate-200 rounded-2xl px-4 py-3 w-full focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none cursor-pointer transition-all duration-200"
-                              >
-                                {Object.values(CompanyTier).map((t) => (
-                                  <option key={t} value={t}>{t}</option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div>
-                              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 block mb-2">Functional Job Role</label>
-                              <select
-                                value={submitForm.role}
-                                onChange={(e) => setSubmitForm({ ...submitForm, role: e.target.value as RoleType })}
-                                className="bg-slate-50 text-sm border border-slate-200 rounded-2xl px-4 py-3 w-full focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none cursor-pointer transition-all duration-200"
-                              >
-                                {Object.values(RoleType).map((role) => (
-                                  <option key={role} value={role}>{role}</option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div>
-                              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 block mb-2">Internal Title</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. SDE II, Senior"
-                                value={submitForm.levelCode}
-                                onChange={(e) => setSubmitForm({ ...submitForm, levelCode: e.target.value })}
-                                className="bg-slate-50 text-sm border border-slate-200 rounded-2xl px-4 py-3 w-full focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none transition-all duration-200"
-                              />
-                            </div>
-
-                            <div className="md:col-span-2">
-                              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 block mb-2">Standardized Level</label>
-                              <select
-                                value={submitForm.standardLevel}
-                                onChange={(e) => setSubmitForm({ ...submitForm, standardLevel: e.target.value })}
-                                className="bg-slate-50 text-sm border border-slate-200 rounded-2xl px-4 py-3 w-full focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none cursor-pointer transition-all duration-200"
-                              >
-                                <option value="L1">L1 - Entry/Assoc</option>
-                                <option value="L2">L2 - Mid-Level</option>
-                                <option value="L3">L3 - Senior</option>
-                                <option value="L4">L4 - Staff</option>
-                                <option value="L5">L5 - Senior Staff</option>
-                                <option value="L6">L6 - Principal</option>
-                                <option value="L7">L7 - Distinguished</option>
-                                <option value="L8">L8 - Fellow</option>
-                              </select>
-                            </div>
-                          </div>
-                        </section>
-
-                        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_-24px_rgba(15,23,42,0.45)] transition-all duration-300 hover:shadow-[0_16px_50px_-24px_rgba(37,99,235,0.4)]">
-                          <div className="flex items-center justify-between gap-3 mb-5">
-                            <div className="flex items-center gap-3">
-                              <div className="rounded-2xl bg-slate-100 p-2">
-                                <DollarSign className="h-4 w-4 text-slate-600" />
-                              </div>
-                              <h3 className="text-base font-semibold text-slate-900">Compensation</h3>
-                            </div>
-                            <div className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-blue-600">
-                              Live
-                            </div>
-                          </div>
-
-                          <div className="rounded-3xl bg-slate-900 px-5 py-5 text-white shadow-lg">
-                            <span className="block text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-300">Total Compensation</span>
-                            <motion.div
-                              key={totalCompensation}
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ duration: 0.25 }}
-                              className="mt-2 text-4xl font-semibold tracking-tight"
-                            >
-                              {formatINR(totalCompensation)}
-                            </motion.div>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 block mb-2">Base Salary</label>
-                              <input
-                                type="number"
-                                required
-                                value={submitForm.baseSalary}
-                                onChange={(e) => setSubmitForm({ ...submitForm, baseSalary: Number(e.target.value) || 0 })}
-                                className="bg-white text-sm border border-slate-200 rounded-2xl px-3 py-3 w-full focus:ring-2 focus:ring-blue-400 outline-none font-mono font-semibold transition-all duration-200"
-                              />
-                            </div>
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 block mb-2">Annual Bonus</label>
-                              <input
-                                type="number"
-                                required
-                                value={submitForm.bonus}
-                                onChange={(e) => setSubmitForm({ ...submitForm, bonus: Number(e.target.value) || 0 })}
-                                className="bg-white text-sm border border-slate-200 rounded-2xl px-3 py-3 w-full focus:ring-2 focus:ring-blue-400 outline-none font-mono font-semibold transition-all duration-200"
-                              />
-                            </div>
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 block mb-2">Annual Stock</label>
-                              <input
-                                type="number"
-                                required
-                                value={submitForm.equity}
-                                onChange={(e) => setSubmitForm({ ...submitForm, equity: Number(e.target.value) || 0 })}
-                                className="bg-white text-sm border border-slate-200 rounded-2xl px-3 py-3 w-full focus:ring-2 focus:ring-blue-400 outline-none font-mono font-semibold transition-all duration-200"
-                              />
-                            </div>
-                          </div>
-                        </section>
-
-                        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_-24px_rgba(15,23,42,0.45)] transition-all duration-300 hover:shadow-[0_16px_50px_-24px_rgba(37,99,235,0.4)]">
-                          <div className="flex items-center gap-3 mb-5">
-                            <div className="rounded-2xl bg-slate-100 p-2">
-                              <Briefcase className="h-4 w-4 text-slate-600" />
-                            </div>
-                            <h3 className="text-base font-semibold text-slate-900">Experience</h3>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 block mb-2">Years of Experience</label>
-                              <input
-                                type="number"
-                                value={submitForm.yearsOfExperience}
-                                onChange={(e) => setSubmitForm({ ...submitForm, yearsOfExperience: Number(e.target.value) || 0 })}
-                                className="bg-slate-50 text-sm border border-slate-200 rounded-2xl px-4 py-3 w-full focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none font-mono transition-all duration-200"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 block mb-2">Years at Company</label>
-                              <input
-                                type="number"
-                                value={submitForm.yearsAtCompany}
-                                onChange={(e) => setSubmitForm({ ...submitForm, yearsAtCompany: Number(e.target.value) || 0 })}
-                                className="bg-slate-50 text-sm border border-slate-200 rounded-2xl px-4 py-3 w-full focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none font-mono transition-all duration-200"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400 block mb-2">Office Location</label>
-                              <select
-                                value={submitForm.location}
-                                onChange={(e) => setSubmitForm({ ...submitForm, location: e.target.value })}
-                                className="bg-slate-50 text-sm border border-slate-200 rounded-2xl px-4 py-3 w-full focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none cursor-pointer transition-all duration-200"
-                              >
-                                {locations.map((l) => (
-                                  <option key={l.name} value={l.name}>{l.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                        </section>
-
-                        <div className="md:sticky md:bottom-6 pt-2">
-                          <button
-                            type="submit"
-                            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm rounded-2xl shadow-[0_10px_30px_-12px_rgba(37,99,235,0.8)] transition-all duration-300 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                          >
-                            <PlusCircle className="h-4 w-4" />
-                            Post Salary Record Anonymously
-                          </button>
-                        </div>
-
-                        <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-2 text-[11px] text-slate-500">
-                          <AlertCircle className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-semibold text-slate-700 block">Automatic Vetting Active</span>
-                            <p className="mt-0.5">
-                              Compensation entries are instantly evaluated. Values outside normal brackets for standard level ranges will flag the post as <strong>unverified</strong> automatically.
-                            </p>
-                          </div>
-                        </div>
-
-                        {formFeedback && (
-                          <div className={`p-4 rounded-2xl text-xs flex items-center gap-2 border ${
-                            formFeedback.type === "success"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                              : "bg-rose-50 text-rose-700 border-rose-100"
-                          }`}>
-                            <CheckCircle className="h-4 w-4 shrink-0" />
-                            <span>{formFeedback.message}</span>
-                          </div>
-                        )}
-                      </form>
-                    </div>
-
-                    <aside className="xl:sticky xl:top-6 self-start space-y-6">
-                      <motion.section
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_12px_40px_-24px_rgba(15,23,42,0.45)]"
-                      >
-                        <div className="flex items-center justify-between mb-5">
-                          <div className="flex items-center gap-2">
-                            <div className="rounded-2xl bg-slate-100 p-2">
-                              <TrendingUp className="h-4 w-4 text-slate-600" />
-                            </div>
-                            <span className="text-sm font-semibold text-slate-900">Live Compensation Summary</span>
-                          </div>
-                        </div>
-
-                        <div className="rounded-3xl bg-slate-900 px-4 py-4 text-white">
-                          <span className="block text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-300">Total Compensation</span>
-                          <motion.div
-                            key={totalCompensation}
-                            initial={{ opacity: 0, scale: 0.98 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ duration: 0.2 }}
-                            className="mt-2 text-3xl font-semibold tracking-tight"
-                          >
-                            {formatINR(totalCompensation)}
-                          </motion.div>
-                        </div>
-
-                        <div className="mt-4 space-y-3">
-                          {compensationBreakdown.map((item) => (
-                            <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold text-slate-700">{item.label}</span>
-                                <span className="text-xs font-semibold text-slate-500 font-mono">{formatINR(item.value)}</span>
-                              </div>
-                              <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
-                                <motion.div
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${item.width}%` }}
-                                  transition={{ duration: 0.3 }}
-                                  className={`h-full rounded-full ${item.color}`}
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </motion.section>
-
-                      <motion.section
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.35 }}
-                        className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_12px_40px_-24px_rgba(15,23,42,0.45)]"
-                      >
-                        <div className="flex items-center gap-2 mb-5">
-                          <div className="rounded-2xl bg-slate-100 p-2">
-                            <ShieldCheck className="h-4 w-4 text-slate-600" />
-                          </div>
-                          <span className="text-sm font-semibold text-slate-900">Verification Status</span>
-                        </div>
-
-                        <div className="flex items-center justify-center">
-                          <div
-                            className="relative h-32 w-32 rounded-full p-2"
-                            style={{
-                              background: `conic-gradient(#2563eb 0deg, #2563eb ${verifiedProbability * 3.6}deg, #e2e8f0 ${verifiedProbability * 3.6}deg, #e2e8f0 360deg)`,
-                            }}
-                          >
-                            <div className="h-full w-full rounded-full bg-white flex items-center justify-center">
-                              <span className="text-3xl font-semibold text-slate-900">{verifiedProbability}%</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 text-center">
-                          <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">Overall Verification Score</span>
-                        </div>
-
-                        <div className="mt-4 space-y-3">
-                          <div className="flex items-start gap-3 rounded-2xl bg-slate-50 px-3 py-3">
-                            {compensationWithinExpectedRange ? <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5" /> : <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5" />}
-                            <span className="text-xs text-slate-700">Compensation within expected range</span>
-                          </div>
-                          <div className="flex items-start gap-3 rounded-2xl bg-slate-50 px-3 py-3">
-                            {experienceMatchesLevel ? <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5" /> : <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5" />}
-                            <span className="text-xs text-slate-700">Experience matches level</span>
-                          </div>
-                          <div className="flex items-start gap-3 rounded-2xl bg-slate-50 px-3 py-3">
-                            {bonusUnusuallyHigh ? <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5" /> : <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5" />}
-                            <span className="text-xs text-slate-700">{bonusUnusuallyHigh ? "Bonus slightly above market" : "Bonus within market range"}</span>
-                          </div>
-                        </div>
-                      </motion.section>
-                    </aside>
-                  </div>
-                </div>
-              )}
+              {activeTab === "share" && <AnonymousSalaryShareForm />}
 
 
             </motion.div>

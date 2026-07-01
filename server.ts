@@ -50,7 +50,7 @@ fs.mkdirSync(uploadDir, { recursive: true });
 const resumeUpload = multer({
   storage: multer.diskStorage({
     destination: uploadDir,
-    filename: (_req: express.Request, file: Express.Multer.File, cb: (error: Error | null, filename?: string) => void) => {
+    filename: (_req: express.Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
       const extension = path.extname(file.originalname || "resume.pdf") || ".pdf";
       cb(null, `${crypto.randomUUID()}${extension}`);
     },
@@ -72,7 +72,11 @@ app.use("/uploads", express.static(uploadDir));
 // Log incoming requests
 app.use((req, res, next) => {
   const logMsg = `[${new Date().toISOString()}] ${req.method} ${req.url} (Body: ${JSON.stringify(req.body)})\n`;
-  fs.appendFileSync(path.join(process.cwd(), "server_log.txt"), logMsg);
+  fs.appendFile(path.join(process.cwd(), "server_log.txt"), logMsg, (error) => {
+    if (error) {
+      console.error("Failed to write server log", error);
+    }
+  });
   next();
 });
 
@@ -101,6 +105,216 @@ let roleViews: Record<string, number> = {
   "DevOps Engineer": 1420,
   "Cybersecurity Engineer": 980
 };
+
+const COMPANY_DIRECTORY = [
+  { id: "company-google", name: "Google", slug: "google", tier: "FAANG", logoUrl: null, createdAt: new Date().toISOString() },
+  { id: "company-microsoft", name: "Microsoft", slug: "microsoft", tier: "FAANG", logoUrl: null, createdAt: new Date().toISOString() },
+  { id: "company-amazon", name: "Amazon", slug: "amazon", tier: "FAANG", logoUrl: null, createdAt: new Date().toISOString() },
+  { id: "company-meta", name: "Meta", slug: "meta", tier: "FAANG", logoUrl: null, createdAt: new Date().toISOString() },
+  { id: "company-apple", name: "Apple", slug: "apple", tier: "FAANG", logoUrl: null, createdAt: new Date().toISOString() },
+  { id: "company-flipkart", name: "Flipkart", slug: "flipkart", tier: "UNICORN", logoUrl: null, createdAt: new Date().toISOString() },
+  { id: "company-swiggy", name: "Swiggy", slug: "swiggy", tier: "UNICORN", logoUrl: null, createdAt: new Date().toISOString() },
+  { id: "company-razorpay", name: "Razorpay", slug: "razorpay", tier: "UNICORN", logoUrl: null, createdAt: new Date().toISOString() },
+  { id: "company-zepto", name: "Zepto", slug: "zepto", tier: "STARTUP", logoUrl: null, createdAt: new Date().toISOString() },
+  { id: "company-atlassian", name: "Atlassian", slug: "atlassian", tier: "MNC", logoUrl: null, createdAt: new Date().toISOString() },
+];
+
+const ROLE_DIRECTORY = {
+  ENGINEERING: [
+    { id: "role-software-engineer", name: "Software Engineer", slug: "software-engineer", category: "ENGINEERING", createdAt: new Date().toISOString() },
+    { id: "role-data-engineer", name: "Data Engineer", slug: "data-engineer", category: "ENGINEERING", createdAt: new Date().toISOString() },
+    { id: "role-devops-engineer", name: "DevOps Engineer", slug: "devops-engineer", category: "ENGINEERING", createdAt: new Date().toISOString() },
+    { id: "role-frontend-engineer", name: "Frontend Engineer", slug: "frontend-engineer", category: "ENGINEERING", createdAt: new Date().toISOString() },
+    { id: "role-backend-engineer", name: "Backend Engineer", slug: "backend-engineer", category: "ENGINEERING", createdAt: new Date().toISOString() },
+    { id: "role-platform-engineer", name: "Platform Engineer", slug: "platform-engineer", category: "ENGINEERING", createdAt: new Date().toISOString() },
+  ],
+  PRODUCT: [
+    { id: "role-product-manager", name: "Product Manager", slug: "product-manager", category: "PRODUCT", createdAt: new Date().toISOString() },
+  ],
+  DATA: [
+    { id: "role-data-scientist", name: "Data Scientist", slug: "data-scientist", category: "DATA", createdAt: new Date().toISOString() },
+  ],
+  DESIGN: [
+    { id: "role-product-designer", name: "Product Designer", slug: "product-designer", category: "DESIGN", createdAt: new Date().toISOString() },
+  ],
+};
+
+function calculatePercentiles(numbers: number[]): { p25: number; p50: number; p75: number } {
+  if (numbers.length === 0) {
+    return { p25: 0, p50: 0, p75: 0 };
+  }
+
+  const sorted = [...numbers].sort((a, b) => a - b);
+
+  const getPercentile = (p: number) => {
+    const index = (sorted.length - 1) * p;
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    const weight = index - lower;
+
+    return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+  };
+
+  return {
+    p25: Math.round(getPercentile(0.25)),
+    p50: Math.round(getPercentile(0.5)),
+    p75: Math.round(getPercentile(0.75)),
+  };
+}
+
+function normalizeLookupKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+const locationAliasMap: Record<string, string[]> = {
+  bengaluru: ["bengaluru", "bangalore"],
+  bangalore: ["bengaluru", "bangalore"],
+  delhi: ["delhi", "delhincr", "gurgaon", "noida"],
+  newdelhi: ["delhi", "delhincr", "gurgaon", "noida"],
+  delhincr: ["delhi", "delhincr", "gurgaon", "noida"],
+  mumbai: ["mumbai"],
+  pune: ["pune"],
+  hyderabad: ["hyderabad"],
+  chennai: ["chennai"],
+};
+
+function buildHistogram(values: number[], bucketCount = 8) {
+  if (values.length === 0) {
+    return {
+      buckets: [] as Array<{ label: string; start: number; end: number; count: number }> ,
+      labels: [] as string[],
+      counts: [] as number[],
+    };
+  }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const bucketSize = range / bucketCount;
+
+  const buckets = Array.from({ length: bucketCount }, (_, index) => {
+    const start = min + index * bucketSize;
+    const end = index === bucketCount - 1 ? max : min + (index + 1) * bucketSize;
+    const count = values.filter((value) => value >= start && (index === bucketCount - 1 ? value <= end : value < end)).length;
+
+    return {
+      label: `${Math.round(start).toLocaleString()}-${Math.round(end).toLocaleString()}`,
+      start: Math.round(start),
+      end: Math.round(end),
+      count,
+    };
+  }).filter((bucket) => bucket.count > 0);
+
+  return {
+    buckets,
+    labels: buckets.map((bucket) => bucket.label),
+    counts: buckets.map((bucket) => bucket.count),
+  };
+}
+
+function buildCompensationAnalytics(records: any[]) {
+  const totalCompensations = records.map((record) => Number(record.totalCompensation ?? 0)).filter((value) => Number.isFinite(value) && value >= 0);
+  const baseSalaries = records.map((record) => Number(record.baseSalary ?? 0)).filter((value) => Number.isFinite(value) && value >= 0);
+  const bonusValues = records.map((record) => Number(record.annualBonus ?? 0)).filter((value) => Number.isFinite(value) && value >= 0);
+  const equityValues = records.map((record) => Number(record.equityValueAnnual ?? 0)).filter((value) => Number.isFinite(value) && value >= 0);
+  const experienceValues = records.map((record) => Number(record.yearsOfExperience ?? 0)).filter((value) => Number.isFinite(value) && value >= 0);
+
+  const totalPercentiles = calculatePercentiles(totalCompensations);
+  const basePercentiles = calculatePercentiles(baseSalaries);
+  const totalSum = totalCompensations.reduce((sum, value) => sum + value, 0);
+  const baseSum = baseSalaries.reduce((sum, value) => sum + value, 0);
+  const bonusSum = bonusValues.reduce((sum, value) => sum + value, 0);
+  const equitySum = equityValues.reduce((sum, value) => sum + value, 0);
+  const experienceSum = experienceValues.reduce((sum, value) => sum + value, 0);
+
+  const companyBuckets = new Map<string, any[]>();
+  const roleBuckets = new Map<string, any[]>();
+  const locationBuckets = new Map<string, any[]>();
+  const experienceBuckets = new Map<number, any[]>();
+
+  for (const record of records) {
+    const companyKey = record.company?.name ?? "Unknown Company";
+    const roleKey = record.role?.name ?? "Unknown Role";
+    const locationKey = record.locationCity ?? "Unknown Location";
+    const experienceKey = Number(record.yearsOfExperience ?? 0);
+
+    if (!companyBuckets.has(companyKey)) companyBuckets.set(companyKey, []);
+    if (!roleBuckets.has(roleKey)) roleBuckets.set(roleKey, []);
+    if (!locationBuckets.has(locationKey)) locationBuckets.set(locationKey, []);
+    if (!experienceBuckets.has(experienceKey)) experienceBuckets.set(experienceKey, []);
+
+    companyBuckets.get(companyKey)!.push(record);
+    roleBuckets.get(roleKey)!.push(record);
+    locationBuckets.get(locationKey)!.push(record);
+    experienceBuckets.get(experienceKey)!.push(record);
+  }
+
+  const buildAverageStats = (grouped: Map<string, any[]>) => Array.from(grouped.entries())
+    .map(([name, items]) => {
+      const totalValues = items.map((item) => Number(item.totalCompensation ?? 0));
+      const baseValues = items.map((item) => Number(item.baseSalary ?? 0));
+      const bonusValues = items.map((item) => Number(item.annualBonus ?? 0));
+      const equityValues = items.map((item) => Number(item.equityValueAnnual ?? 0));
+      const percentiles = calculatePercentiles(totalValues);
+      return {
+        name,
+        submissionCount: items.length,
+        averageTotalCompensation: Math.round(totalValues.reduce((sum, value) => sum + value, 0) / (totalValues.length || 1)),
+        averageBaseSalary: Math.round(baseValues.reduce((sum, value) => sum + value, 0) / (baseValues.length || 1)),
+        averageAnnualBonus: Math.round(bonusValues.reduce((sum, value) => sum + value, 0) / (bonusValues.length || 1)),
+        averageEquityValue: Math.round(equityValues.reduce((sum, value) => sum + value, 0) / (equityValues.length || 1)),
+        medianTotalCompensation: percentiles.p50,
+        minTotalCompensation: Math.min(...totalValues, 0),
+        maxTotalCompensation: Math.max(...totalValues, 0),
+        p25TotalCompensation: percentiles.p25,
+        p75TotalCompensation: percentiles.p75,
+      };
+    })
+    .sort((left, right) => right.submissionCount - left.submissionCount);
+
+  const experienceStats = Array.from(experienceBuckets.entries())
+    .map(([experience, items]) => {
+      const totalValues = items.map((item) => Number(item.totalCompensation ?? 0));
+      return {
+        yearsOfExperience: experience,
+        submissionCount: items.length,
+        averageTotalCompensation: Math.round(totalValues.reduce((sum, value) => sum + value, 0) / (totalValues.length || 1)),
+      };
+    })
+    .sort((left, right) => left.yearsOfExperience - right.yearsOfExperience);
+
+  const histogram = buildHistogram(totalCompensations);
+
+  return {
+    submissionCount: records.length,
+    averageTotalCompensation: totalCompensations.length ? Math.round(totalSum / totalCompensations.length) : 0,
+    averageBaseSalary: baseSalaries.length ? Math.round(baseSum / baseSalaries.length) : 0,
+    averageAnnualBonus: bonusValues.length ? Math.round(bonusSum / bonusValues.length) : 0,
+    averageEquityValue: equityValues.length ? Math.round(equitySum / equityValues.length) : 0,
+    averageYearsOfExperience: experienceValues.length ? Math.round((experienceSum / experienceValues.length) * 10) / 10 : 0,
+    medianTotalCompensation: totalPercentiles.p50,
+    medianBaseSalary: basePercentiles.p50,
+    minTotalCompensation: totalCompensations.length ? Math.min(...totalCompensations) : 0,
+    maxTotalCompensation: totalCompensations.length ? Math.max(...totalCompensations) : 0,
+    p25TotalCompensation: totalPercentiles.p25,
+    p75TotalCompensation: totalPercentiles.p75,
+    marketRange: {
+      min: totalCompensations.length ? Math.min(...totalCompensations) : 0,
+      max: totalCompensations.length ? Math.max(...totalCompensations) : 0,
+      median: totalPercentiles.p50,
+      p25: totalPercentiles.p25,
+      p75: totalPercentiles.p75,
+    },
+    companyAverages: buildAverageStats(companyBuckets),
+    roleAverages: buildAverageStats(roleBuckets),
+    locationAverages: buildAverageStats(locationBuckets),
+    companyStatistics: buildAverageStats(companyBuckets),
+    roleStatistics: buildAverageStats(roleBuckets),
+    experienceAverages: experienceStats,
+    compensationDistribution: histogram.buckets,
+    histogram,
+  };
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || "compintel-dev-secret";
 const appUrl = process.env.APP_URL || "http://localhost:3000";
@@ -888,42 +1102,241 @@ app.post("/api/trending/view", (req, res) => {
   res.json({ success: true, views: roleViews[role] || 0 });
 });
 
-// 1. Get all compensations (with filters)
-app.get("/api/compensations", (req, res) => {
+// 1. Get compensated market data with filters and percentile stats
+app.get("/api/compensation", async (req, res) => {
   try {
-    let filtered = [...compensations];
+    const companyId = String(req.query.company_id || "").trim() || undefined;
+    const roleId = String(req.query.role_id || "").trim() || undefined;
+    const levelId = String(req.query.level_id || "").trim() || undefined;
+    const locationCountry = String(req.query.location_country || "India").trim() || "India";
+    const locationCity = String(req.query.location_city || "").trim() || undefined;
+    const minYoe = req.query.min_yoe ? Number(req.query.min_yoe) : undefined;
+    const maxYoe = req.query.max_yoe ? Number(req.query.max_yoe) : undefined;
+    const search = String(req.query.search || "").trim() || undefined;
 
-    const { role, company, level, location, search } = req.query;
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit || 20)));
+    const skip = (page - 1) * limit;
 
-    if (role) {
-      filtered = filtered.filter(item => item.role === role);
-    }
-    if (company) {
-      filtered = filtered.filter(item => item.companyName.toLowerCase() === (company as string).toLowerCase());
-    }
-    if (level) {
-      filtered = filtered.filter(item => item.standardLevel === level);
-    }
-    if (location) {
-      filtered = filtered.filter(item => item.location === location);
-    }
-    if (search) {
-      const q = (search as string).toLowerCase();
-      filtered = filtered.filter(item => 
-        item.companyName.toLowerCase().includes(q) ||
-        item.location.toLowerCase().includes(q) ||
-        item.levelCode.toLowerCase().includes(q)
-      );
-    }
+    const normalizedCity = locationCity ? normalizeLookupKey(locationCity.split(",")[0] ?? "") : "";
+    const locationAliasList = normalizedCity ? locationAliasMap[normalizedCity] ?? [normalizedCity] : [];
 
-    res.json(filtered);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message || "Failed to load compensations" });
+    const where: any = {
+      deletedAt: null,
+      ...(companyId ? { companyId } : {}),
+      ...(roleId ? { roleId } : {}),
+      ...(levelId ? { levelId } : {}),
+      ...(locationCountry ? { locationCountry: { equals: locationCountry, mode: "insensitive" } } : {}),
+      ...(minYoe !== undefined ? { yearsOfExperience: { gte: minYoe } } : {}),
+      ...(maxYoe !== undefined ? { yearsOfExperience: { lte: maxYoe } } : {}),
+      ...(locationCity
+        ? {
+            OR: locationAliasList.map((alias) => ({
+              locationCity: { contains: alias, mode: "insensitive" },
+            })),
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { company: { name: { contains: search, mode: "insensitive" } } },
+              { role: { name: { contains: search, mode: "insensitive" } } },
+              { locationCity: { contains: search, mode: "insensitive" } },
+              { locationRegion: { contains: search, mode: "insensitive" } },
+              { level: { levelName: { contains: search, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    };
+
+    const filteredRecords = await db.compensationEntry.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        companyId: true,
+        roleId: true,
+        levelId: true,
+        locationCity: true,
+        locationCountry: true,
+        locationRegion: true,
+        yearsOfExperience: true,
+        baseSalary: true,
+        annualBonus: true,
+        equityValueAnnual: true,
+        totalCash: true,
+        totalCompensation: true,
+        currency: true,
+        offerDate: true,
+        employmentType: true,
+        dataSource: true,
+        isVerified: true,
+        createdAt: true,
+        deletedAt: true,
+        company: { select: { id: true, name: true, slug: true, tier: true, logoUrl: true } },
+        role: { select: { id: true, name: true, slug: true, category: true } },
+        level: { select: { id: true, levelName: true, levelOrder: true, roleCategory: true } },
+      },
+    });
+
+    const analytics = buildCompensationAnalytics(filteredRecords);
+    const paginated = filteredRecords.slice(skip, skip + limit).map((entry: any) => ({
+      id: entry.id,
+      companyId: entry.companyId,
+      roleId: entry.roleId,
+      levelId: entry.levelId,
+      companyName: entry.company?.name ?? "Unknown Company",
+      tier: entry.company?.tier ?? "OTHER",
+      role: entry.role?.name ?? "Unknown Role",
+      levelCode: entry.level?.levelName ?? "L3",
+      standardLevel: entry.level?.levelName ?? "L3",
+      location: `${entry.locationCity ?? "Unknown"}, ${entry.locationCountry ?? "India"}`,
+      locationCity: entry.locationCity,
+      locationCountry: entry.locationCountry,
+      locationRegion: entry.locationRegion,
+      yearsOfExperience: Number(entry.yearsOfExperience ?? 0),
+      yearsAtCompany: Number(entry.yearsOfExperience ?? 0),
+      baseSalary: Number(entry.baseSalary ?? 0),
+      bonus: Number(entry.annualBonus ?? 0),
+      annualBonus: Number(entry.annualBonus ?? 0),
+      equity: Number(entry.equityValueAnnual ?? 0),
+      equityValueAnnual: Number(entry.equityValueAnnual ?? 0),
+      totalCash: Number(entry.totalCash ?? 0),
+      totalCompensation: Number(entry.totalCompensation ?? 0),
+      currency: entry.currency ?? "INR",
+      offerDate: entry.offerDate,
+      employmentType: entry.employmentType ?? "FULLTIME",
+      dataSource: entry.dataSource ?? "SELF_REPORTED",
+      verified: Boolean(entry.isVerified),
+      isVerified: Boolean(entry.isVerified),
+      createdAt: entry.createdAt,
+      deletedAt: entry.deletedAt,
+      submittedAt: entry.createdAt,
+      company: entry.company,
+      roleDetails: entry.role,
+      level: entry.level,
+    }));
+
+    res.json({
+      data: paginated,
+      meta: {
+        total: filteredRecords.length,
+        page,
+        limit,
+        stats: {
+          count: filteredRecords.length,
+          median_base: analytics.medianBaseSalary,
+          median_total: analytics.medianTotalCompensation,
+          p25_total: analytics.p25TotalCompensation,
+          p75_total: analytics.p75TotalCompensation,
+          highest_total: analytics.maxTotalCompensation,
+          average_total_compensation: analytics.averageTotalCompensation,
+          average_base_salary: analytics.averageBaseSalary,
+          average_annual_bonus: analytics.averageAnnualBonus,
+          average_equity_value: analytics.averageEquityValue,
+          average_years_of_experience: analytics.averageYearsOfExperience,
+          market_range: analytics.marketRange,
+          distribution: analytics.compensationDistribution,
+          histogram: analytics.histogram,
+          submission_count: analytics.submissionCount,
+          company_averages: analytics.companyAverages,
+          role_averages: analytics.roleAverages,
+          location_averages: analytics.locationAverages,
+          company_statistics: analytics.companyStatistics,
+          role_statistics: analytics.roleStatistics,
+          experience_averages: analytics.experienceAverages,
+          min_total_compensation: analytics.minTotalCompensation,
+          max_total_compensation: analytics.maxTotalCompensation,
+        },
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load compensation market data" });
+  }
+});
+
+app.get("/api/compensation/analytics", async (req, res) => {
+  try {
+    const companyId = String(req.query.company_id || "").trim() || undefined;
+    const roleId = String(req.query.role_id || "").trim() || undefined;
+    const levelId = String(req.query.level_id || "").trim() || undefined;
+    const locationCountry = String(req.query.location_country || "India").trim() || "India";
+    const locationCity = String(req.query.location_city || "").trim() || undefined;
+    const minYoe = req.query.min_yoe ? Number(req.query.min_yoe) : undefined;
+    const maxYoe = req.query.max_yoe ? Number(req.query.max_yoe) : undefined;
+    const search = String(req.query.search || "").trim() || undefined;
+
+    const normalizedCity = locationCity ? normalizeLookupKey(locationCity.split(",")[0] ?? "") : "";
+    const locationAliasList = normalizedCity ? locationAliasMap[normalizedCity] ?? [normalizedCity] : [];
+
+    const where: any = {
+      deletedAt: null,
+      ...(companyId ? { companyId } : {}),
+      ...(roleId ? { roleId } : {}),
+      ...(levelId ? { levelId } : {}),
+      ...(locationCountry ? { locationCountry: { equals: locationCountry, mode: "insensitive" } } : {}),
+      ...(minYoe !== undefined ? { yearsOfExperience: { gte: minYoe } } : {}),
+      ...(maxYoe !== undefined ? { yearsOfExperience: { lte: maxYoe } } : {}),
+      ...(locationCity
+        ? {
+            OR: locationAliasList.map((alias) => ({
+              locationCity: { contains: alias, mode: "insensitive" },
+            })),
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { company: { name: { contains: search, mode: "insensitive" } } },
+              { role: { name: { contains: search, mode: "insensitive" } } },
+              { locationCity: { contains: search, mode: "insensitive" } },
+              { locationRegion: { contains: search, mode: "insensitive" } },
+              { level: { levelName: { contains: search, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    };
+
+    const records = await db.compensationEntry.findMany({
+      where,
+      select: {
+        id: true,
+        companyId: true,
+        roleId: true,
+        levelId: true,
+        locationCity: true,
+        locationCountry: true,
+        locationRegion: true,
+        yearsOfExperience: true,
+        baseSalary: true,
+        annualBonus: true,
+        equityValueAnnual: true,
+        totalCash: true,
+        totalCompensation: true,
+        currency: true,
+        offerDate: true,
+        employmentType: true,
+        dataSource: true,
+        isVerified: true,
+        createdAt: true,
+        deletedAt: true,
+        company: { select: { id: true, name: true, slug: true, tier: true, logoUrl: true } },
+        role: { select: { id: true, name: true, slug: true, category: true } },
+        level: { select: { id: true, levelName: true, levelOrder: true, roleCategory: true } },
+      },
+    });
+
+    res.json({
+      data: records,
+      analytics: buildCompensationAnalytics(records),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load compensation analytics" });
   }
 });
 
 // 2. Submit new compensation
-app.post("/api/compensations", async (req, res) => {
+app.post("/api/compensation", async (req, res) => {
   try {
     const {
       companyName,
@@ -936,10 +1349,12 @@ app.post("/api/compensations", async (req, res) => {
       equity,
       location,
       yearsOfExperience,
-      yearsAtCompany
+      yearsAtCompany,
+      locationCountry,
+      locationCity,
+      currency,
     } = req.body;
 
-    // Server-side basic validation
     if (!companyName || !role || !standardLevel || !location) {
       return res.status(400).json({ error: "Required fields are missing" });
     }
@@ -949,52 +1364,137 @@ app.post("/api/compensations", async (req, res) => {
     const equityVal = Number(equity) || 0;
     const totalComp = baseVal + bonusVal + equityVal;
 
-    // Authentication and Verification check
+    const company = await db.company.upsert({
+      where: { slug: normalizeLookupKey(companyName) },
+      update: {},
+      create: {
+        name: companyName,
+        slug: normalizeLookupKey(companyName),
+        tier: tier || "OTHER",
+      },
+    });
+
+    const normalizedRoleSlug = normalizeLookupKey(role);
+    const roleRecord = await db.role.upsert({
+      where: { slug: normalizedRoleSlug },
+      update: {},
+      create: {
+        name: role,
+        slug: normalizedRoleSlug,
+        category: /product|designer|design/i.test(role) ? "PRODUCT" : /data/i.test(role) ? "DATA" : "ENGINEERING",
+      },
+    });
+
+    const levelName = String(levelCode || standardLevel || "L3");
+    const levelOrder = Number(levelName.replace(/\D/g, "")) || 3;
+    const roleCategory = roleRecord.category || "ENGINEERING";
+
+    const level = await db.level.upsert({
+      where: {
+        companyId_roleCategory_levelName: {
+          companyId: company.id,
+          roleCategory,
+          levelName,
+        },
+      },
+      update: {},
+      create: {
+        companyId: company.id,
+        roleCategory,
+        levelName,
+        levelOrder,
+      },
+    });
+
     const authedUser = await getAuthenticatedUser(req);
-    let verified = false;
+    const verified = Boolean(authedUser) || (totalComp >= 15000 && totalComp <= 5000000 && baseVal >= 5000);
 
-    if (authedUser) {
-      // Authenticated users get their submissions instantly verified!
-      verified = true;
-    } else {
-      // For anonymous/unauthenticated users, run statistical validation
-      verified = true;
-      if (totalComp > 5000000 || totalComp < 15000 || baseVal < 5000) {
-        verified = false;
-      }
-    }
+    const createdRecord = await db.compensationEntry.create({
+      data: {
+        companyId: company.id,
+        roleId: roleRecord.id,
+        levelId: level.id,
+        locationCity: locationCity || location?.split(",")[0]?.trim() || "Bangalore",
+        locationCountry: locationCountry || "India",
+        locationRegion: location || "India",
+        yearsOfExperience: Number(yearsOfExperience) || 0,
+        baseSalary: baseVal,
+        annualBonus: bonusVal,
+        equityValueAnnual: equityVal,
+        totalCash: baseVal + bonusVal,
+        totalCompensation: totalComp,
+        currency: currency || "INR",
+        offerDate: new Date().toISOString().slice(0, 7),
+        employmentType: "FULLTIME",
+        dataSource: "SELF_REPORTED",
+        isVerified: verified,
+        qualityScore: verified ? 100 : 60,
+      },
+      include: {
+        company: true,
+        role: true,
+        level: true,
+      },
+    });
 
-    const newRecord: CompensationRecord = {
-      id: String(compensations.length + 1),
-      companyName,
-      tier: tier || CompanyTier.TIER_3,
-      role: role as RoleType,
-      levelCode: levelCode || standardLevel,
-      standardLevel,
-      baseSalary: baseVal,
-      bonus: bonusVal,
-      equity: equityVal,
-      totalCompensation: totalComp,
-      location,
-      yearsOfExperience: Number(yearsOfExperience) || 0,
-      yearsAtCompany: Number(yearsAtCompany) || 0,
-      verified,
-      submittedAt: new Date().toISOString()
-    };
-
-    compensations.unshift(newRecord);
-    res.status(201).json(newRecord);
+    res.status(201).json(createdRecord);
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to submit compensation" });
   }
 });
 
-// 3. Get level matrices
-app.get("/api/levels", (req, res) => {
-  res.json(LEVEL_MATRICES);
+app.post("/api/compensations", async (req, res) => {
+  return res.status(308).redirect(307, "/api/compensation");
 });
 
-// 4. Get available locations
+// 3. Get supported companies for the smart share form
+app.get("/api/companies", async (req, res) => {
+  try {
+    const companies = await db.company.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, slug: true, tier: true, logoUrl: true, createdAt: true },
+    });
+    res.json({ data: companies });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load companies" });
+  }
+});
+
+// 4. Get supported roles for the smart share form
+app.get("/api/roles", async (req, res) => {
+  try {
+    const roles = await db.role.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, slug: true, category: true, createdAt: true },
+    });
+    res.json({ data: roles });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load roles" });
+  }
+});
+
+// 5. Get level matrices
+app.get("/api/levels", async (req, res) => {
+  try {
+    const companyId = String(req.query.company_id || "").trim() || undefined;
+    const roleCategory = String(req.query.role_category || "").trim() || undefined;
+
+    const levels = await db.level.findMany({
+      where: {
+        ...(companyId ? { companyId } : {}),
+        ...(roleCategory ? { roleCategory: { equals: roleCategory, mode: "insensitive" } } : {}),
+      },
+      orderBy: { levelOrder: "asc" },
+      select: { id: true, companyId: true, roleCategory: true, levelName: true, levelOrder: true, createdAt: true },
+    });
+
+    res.json(levels);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load levels" });
+  }
+});
+
+// 6. Get available locations
 app.get("/api/locations", (req, res) => {
   res.json(STAGE_LOCATIONS);
 });

@@ -4,7 +4,7 @@ import { CompanyTier, Currency, StandardLevel, COMMON_TECH_ROLES } from "../type
 export const salaryRecordSchema = z.object({
   companyTier: z.nativeEnum(CompanyTier),
   companyNameOptional: z.string().trim().max(120).optional(),
-  role: z.enum(COMMON_TECH_ROLES),
+  role: z.string().trim().min(1).max(120),
   standardLevel: z.nativeEnum(StandardLevel),
   baseSalary: z.number().int().min(0).max(100_000_000),
   annualBonus: z.number().int().min(0).max(100_000_000),

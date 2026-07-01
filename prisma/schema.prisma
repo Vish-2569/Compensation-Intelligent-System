@@ -36,6 +36,8 @@ model User {
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
 
+  compensationEntries CompensationEntry[] @relation("SubmittedBy")
+
   @@map("users")
 }
 
@@ -47,8 +49,10 @@ model Company {
   logoUrl   String?  @map("logo_url")
   createdAt DateTime @default(now()) @map("created_at")
 
-  levels        Level[]
-  compensations CompensationEntry[]
+  levels               Level[]
+  compensations        CompensationEntry[]
+  marketStatistics     MarketStatistic[]
+  submissionAnalytics  SubmissionAnalytics[]
 
   @@map("companies")
 }
@@ -60,7 +64,9 @@ model Role {
   category  String   @default("OTHER")
   createdAt DateTime @default(now()) @map("created_at")
 
-  compensations CompensationEntry[]
+  compensations       CompensationEntry[]
+  marketStatistics    MarketStatistic[]
+  submissionAnalytics SubmissionAnalytics[]
 
   @@map("roles")
 }
@@ -75,12 +81,33 @@ model Level {
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  compensations     CompensationEntry[]
-  mappedFromLevels  LevelMapping[]      @relation("MappedFrom")
-  mappedToLevels    LevelMapping[]      @relation("MappedTo")
+  compensations       CompensationEntry[]
+  marketStatistics    MarketStatistic[]
+  submissionAnalytics SubmissionAnalytics[]
+  mappedFromLevels    LevelMapping[]      @relation("MappedFrom")
+  mappedToLevels      LevelMapping[]      @relation("MappedTo")
 
   @@unique([companyId, roleCategory, levelName])
+  @@index([companyId, roleCategory, levelOrder])
   @@map("levels")
+}
+
+model Location {
+  id           String   @id @default(uuid())
+  city         String   @default("Unknown")
+  region       String   @default("")
+  country      String   @default("Unknown")
+  displayName  String?  @map("display_name")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  compensationEntries CompensationEntry[]
+  marketStatistics    MarketStatistic[]
+  submissionAnalytics SubmissionAnalytics[]
+
+  @@unique([country, region, city])
+  @@index([country, region, city])
+  @@map("locations")
 }
 
 model CompensationEntry {
@@ -88,6 +115,8 @@ model CompensationEntry {
   companyId          String    @map("company_id")
   roleId             String    @map("role_id")
   levelId            String    @map("level_id")
+  locationId         String?   @map("location_id")
+  submittedById      String?   @map("submitted_by_id")
   locationCity       String    @map("location_city")
   locationCountry    String    @map("location_country")
   locationRegion     String    @map("location_region")
@@ -106,16 +135,76 @@ model CompensationEntry {
   deletedAt          DateTime? @map("deleted_at")
   createdAt          DateTime  @default(now()) @map("created_at")
 
-  company Company @relation(fields: [companyId], references: [id])
-  role    Role    @relation(fields: [roleId], references: [id])
-  level   Level   @relation(fields: [levelId], references: [id])
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  role        Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  level       Level     @relation(fields: [levelId], references: [id], onDelete: Restrict)
+  location    Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  submittedBy User?     @relation("SubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
 
-  @@index([companyId])
-  @@index([roleId])
-  @@index([levelId])
+  @@index([companyId, roleId, levelId, locationId, isVerified, totalCompensation])
+  @@index([companyId, roleId, locationId])
+  @@index([submittedById])
+  @@index([isVerified, totalCompensation])
+  @@index([createdAt])
   @@index([locationCountry, locationCity])
   @@index([yearsOfExperience])
   @@map("compensation_entries")
+}
+
+model MarketStatistic {
+  id                          String   @id @default(uuid())
+  companyId                   String?  @map("company_id")
+  roleId                      String?  @map("role_id")
+  levelId                     String?  @map("level_id")
+  locationId                  String?  @map("location_id")
+  currency                    String   @default("INR")
+  observationWindowStart      DateTime? @map("observation_window_start")
+  observationWindowEnd        DateTime? @map("observation_window_end")
+  sampleSize                  Int      @default(0) @map("sample_size")
+  averageTotalCompensation    Float?   @map("average_total_compensation")
+  medianTotalCompensation     Float?   @map("median_total_compensation")
+  minTotalCompensation        Float?   @map("min_total_compensation")
+  maxTotalCompensation        Float?   @map("max_total_compensation")
+  percentile25                Float?   @map("percentile_25")
+  percentile75                Float?   @map("percentile_75")
+  distribution                Json?    @map("distribution")
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  company  Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role     Role?     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  level    Level?    @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, roleId, levelId, locationId, currency, createdAt])
+  @@index([companyId, createdAt])
+  @@index([roleId, createdAt])
+  @@map("market_statistics")
+}
+
+model SubmissionAnalytics {
+  id                          String   @id @default(uuid())
+  companyId                   String?  @map("company_id")
+  roleId                      String?  @map("role_id")
+  levelId                     String?  @map("level_id")
+  locationId                  String?  @map("location_id")
+  periodKey                   String?  @map("period_key")
+  submissionCount             Int      @default(0) @map("submission_count")
+  verifiedSubmissionCount     Int      @default(0) @map("verified_submission_count")
+  averageTotalCompensation    Float?   @map("average_total_compensation")
+  medianTotalCompensation     Float?   @map("median_total_compensation")
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  company  Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role     Role?     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  level    Level?    @relation(fields: [levelId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, roleId, levelId, locationId, periodKey])
+  @@index([companyId, roleId, locationId, periodKey])
+  @@index([submissionCount])
+  @@map("submission_analytics")
 }
 
 model LevelMapping {
